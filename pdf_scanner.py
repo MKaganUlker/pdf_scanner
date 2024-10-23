@@ -29,7 +29,7 @@ def preprocess_image(image):
     
     return binary
 
-def detect_table(image):
+def detect_and_crop_table(image, original_image):
     # Detect horizontal and vertical lines using morphology to identify table structure
     horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 1))
     vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 50))
@@ -43,8 +43,18 @@ def detect_table(image):
     # Find contours of the table
     contours, _ = cv2.findContours(table_structure, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+    # Check if we detected any contours (tables)
     if contours:
-        return True, table_structure
+        # Assume the largest contour is the table (in case there are multiple)
+        largest_contour = max(contours, key=cv2.contourArea)
+
+        # Get bounding box around the largest contour
+        x, y, w, h = cv2.boundingRect(largest_contour)
+
+        # Crop the original image to the bounding box of the table
+        table_image = original_image[y:y+h, x:x+w]
+
+        return True, table_image
     return False, None
 
 def save_image_as_png(image, output_path):
@@ -54,19 +64,21 @@ def scan_pdf_for_tables(pdf_path, output_dir):
     images = convert_pdf_to_image(pdf_path)
     for i, image in enumerate(images):
         processed_image = preprocess_image(image)
-        has_table, table_img = detect_table(processed_image)
+        has_table, cropped_table = detect_and_crop_table(processed_image, image)
         
         if has_table:
             output_file = os.path.join(output_dir, f"page_{i+1}_table.png")
-            save_image_as_png(image, output_file)
+            save_image_as_png(cropped_table, output_file)
             print(f"Table found on page {i+1}, saved as {output_file}")
         else:
             print(f"No table found on page {i+1}.")
 
 if __name__ == "__main__":
-    pdf_path = input("Enter the path to the PDF file: ")
-    output_dir = input("Enter the directory to save PNG files: ")
+    # Hardcoded file paths instead of input
+    pdf_path = "table.pdf"
+    output_dir = os.path.join(os.path.expanduser("~"), "Desktop")  # Path to user's Desktop directory
 
+    # Create output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
